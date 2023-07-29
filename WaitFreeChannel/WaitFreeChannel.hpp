@@ -7,11 +7,11 @@
 // Only one value can be published at a time
 template<typename Type>
 class WaitFreeChannel {
-    std::optional<Type> _value;
+    alignas(64) size_t _nextInsertionIndex = 0;
+    std::optional<Type> _values[2];
     std::atomic<Type*> _ptr = nullptr;
 public:
     WaitFreeChannel() = default;
-    WaitFreeChannel(Type&& value) : _value(std::forward<Type>(value)), _ptr(&_value.value()) {}
     WaitFreeChannel(const WaitFreeChannel&) = delete;
     WaitFreeChannel(const WaitFreeChannel&&) = delete;
     void operator=(const WaitFreeChannel&) = delete;
@@ -29,8 +29,9 @@ public:
             // Other thread still hasn't processed the other value you posted; don't publish
             return false;
         }
-        _value.emplace(std::forward<Args>(args)...);
-        _ptr.store(&_value.value(), std::memory_order::release);
+        _values[_nextInsertionIndex].emplace(std::forward<Args>(args)...);
+        _ptr.store(&_values[_nextInsertionIndex].value(), std::memory_order::release);
+        _nextInsertionIndex = (_nextInsertionIndex + 1) % 2;
         return true;
     }
 
