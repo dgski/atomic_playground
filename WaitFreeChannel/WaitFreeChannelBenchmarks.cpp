@@ -11,34 +11,41 @@ inline auto benchmarkAndReturn(Func func) {
     return std::make_pair(result, std::chrono::duration_cast<std::chrono::nanoseconds>(t2-t1).count());
 }
 
+
 // Locking re-creation of the 'WaitFreeChannel' channel interface
 template<typename Type>
 class LockingChannel {
     std::mutex _mutex;
-    bool _read = true;
-    std::optional<Type> _value;
+    Type* _ptr = nullptr;
+    size_t _nextInsertionIndex = 0;
+    std::optional<Type> _values[2];
 public:
     LockingChannel() {}
 
     __attribute__((always_inline)) Type* getLatestValue() {
+        Type* result = nullptr;
         std::lock_guard lock(_mutex);
-        if (_read ) [[likely]] {
-            return nullptr;
-        }
-        _read = true;
-        return &_value.value();
+        std::swap(result, _ptr);
+        return result;
     }
 
     template<typename... Args>
     __attribute__((always_inline)) bool tryPublishLatestValue(Args&&... args) {
         std::lock_guard lock(_mutex);
-        if (!_read && _value.has_value()) {
+        if (_ptr) {
             return false;
         }
-        _read = false;
-        _value.emplace(std::forward<Args>(args)...);
+        _values[_nextInsertionIndex].emplace(std::forward<Args>(args)...);
+        _ptr = &_values[_nextInsertionIndex].value();
+        _nextInsertionIndex = (_nextInsertionIndex + 1) % 2;
         return true;
     }
+};
+
+struct Message {
+    std::string _data = "this is a data";
+    Message(std::string data) : _data(data) {}
+    auto& data() { return _data; }
 };
 
 template<typename ChannelType>
@@ -64,7 +71,9 @@ size_t runChannelReadLatencyBenchmark() {
     // Thread two: background processing thread (has all the time in the world)
     auto t2 = std::thread([&]() {
         while (running.load(std::memory_order::relaxed)) {
-            while (!channel.tryPublishLatestValue()) {}
+            if (!channel.tryPublishLatestValue("here is a mesage")) {
+                continue;
+            }
         }
     });
 
@@ -78,9 +87,7 @@ size_t runChannelReadLatencyBenchmark() {
     return (totalNanoSecondsTaken / reads);
 }
 
-struct Message {};
-
-template size_t runChannelReadLatencyBenchmark<LockingChannel<Message>>();
+//template size_t runChannelReadLatencyBenchmark<LockingChannel<Message>>();
 template size_t runChannelReadLatencyBenchmark<WaitFreeChannel<Message>>();
 
 int main() {
