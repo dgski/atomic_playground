@@ -11,7 +11,7 @@ class WaitFreeChannel {
     std::atomic<Type*> _ptr = nullptr;
 public:
     WaitFreeChannel() = default;
-    WaitFreeChannel(Type&& value) : _value(value), _ptr(&_value.value()) {}
+    WaitFreeChannel(Type&& value) : _value(std::forward<Type>(value)), _ptr(&_value.value()) {}
     WaitFreeChannel(const WaitFreeChannel&) = delete;
     WaitFreeChannel(const WaitFreeChannel&&) = delete;
     void operator=(const WaitFreeChannel&) = delete;

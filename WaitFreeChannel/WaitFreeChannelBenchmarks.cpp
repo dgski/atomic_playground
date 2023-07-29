@@ -84,7 +84,7 @@ template size_t runChannelReadLatencyBenchmark<LockingChannel<Message>>();
 template size_t runChannelReadLatencyBenchmark<WaitFreeChannel<Message>>();
 
 int main() {
-    std::cout << "locking averagePollingTime=" << runChannelReadLatencyBenchmark<LockingChannel<Message>>() << std::endl;
-    std::cout << "waitFree averagePollingTime=" << runChannelReadLatencyBenchmark<WaitFreeChannel<Message>>() << std::endl;
+    std::cout << "locking averagePollingTimeNs=" << runChannelReadLatencyBenchmark<LockingChannel<Message>>() << std::endl;
+    std::cout << "waitFree averagePollingTimeNs=" << runChannelReadLatencyBenchmark<WaitFreeChannel<Message>>() << std::endl;
     return EXIT_SUCCESS;
 }
