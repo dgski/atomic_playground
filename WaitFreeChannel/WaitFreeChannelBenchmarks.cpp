@@ -11,7 +11,6 @@ inline auto benchmarkAndReturn(Func func) {
     return std::make_pair(result, std::chrono::duration_cast<std::chrono::nanoseconds>(t2-t1).count());
 }
 
-
 // Locking re-creation of the 'WaitFreeChannel' channel interface
 template<typename Type>
 class LockingChannel {
@@ -83,7 +82,6 @@ size_t runChannelReadLatencyBenchmark() {
 
     t1.join();
     t2.join();
-
     return (totalNanoSecondsTaken / reads);
 }
 
