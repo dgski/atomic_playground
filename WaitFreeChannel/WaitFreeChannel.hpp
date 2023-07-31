@@ -8,8 +8,8 @@
 template<typename Type>
 class WaitFreeChannel {
     alignas(64) size_t _nextInsertionIndex = 0;
-    std::optional<Type> _values[2];
-    std::atomic<Type*> _ptr = nullptr;
+    alignas(64) std::optional<Type> _values[2];
+    alignas(64) std::atomic<Type*> _ptr = nullptr;
 public:
     WaitFreeChannel() = default;
     WaitFreeChannel(const WaitFreeChannel&) = delete;
