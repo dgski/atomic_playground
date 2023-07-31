@@ -25,7 +25,7 @@ public:
     // Try to publish a new value, returns true if successful, false if not
     template<typename... Args>
     __attribute__((always_inline)) bool tryPublishLatestValue(Args&&... args) {
-        if (_ptr.load(std::memory_order::seq_cst) != nullptr) {
+        if (_ptr.load(std::memory_order::relaxed) != nullptr) {
             // Other thread still hasn't processed the other value you posted; don't publish
             return false;
         }
