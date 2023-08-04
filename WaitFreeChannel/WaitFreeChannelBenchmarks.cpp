@@ -47,19 +47,27 @@ struct Message {
     auto& data() { return _data; }
 };
 
+struct BenchmarkResult {
+    size_t reads;
+    size_t writes;
+};
+
 template<typename ChannelType>
-size_t runChannelReadLatencyBenchmark() {
+BenchmarkResult runChannelReadLatencyBenchmark() {
     std::atomic<bool> running = true;
     ChannelType channel;
 
-    size_t totalNanoSecondsTaken = 0;
+    size_t totalNanoSecondsTakenReads = 0;
     size_t reads = 0;
+
+    size_t totalNanoSecondsTakenWrites = 0;
+    size_t writes = 0;
 
     // Thread one: critical that should minimize polling time
     auto t1 = std::thread([&]() {
         while (running.load(std::memory_order::relaxed)) {
             auto [nextMessage, timeTaken] = benchmarkAndReturn([&]() { return channel.getLatestValue(); });
-            totalNanoSecondsTaken += timeTaken;
+            totalNanoSecondsTakenReads += timeTaken;
             ++reads;
             if (!nextMessage) {
                 continue;
@@ -70,9 +78,9 @@ size_t runChannelReadLatencyBenchmark() {
     // Thread two: background processing thread (has all the time in the world)
     auto t2 = std::thread([&]() {
         while (running.load(std::memory_order::relaxed)) {
-            if (!channel.tryPublishLatestValue("here is a mesage")) {
-                continue;
-            }
+            auto [result, timeTaken] = benchmarkAndReturn([&]() { return channel.tryPublishLatestValue("here is a mesage"); });
+            totalNanoSecondsTakenWrites += timeTaken;
+            ++writes;
         }
     });
 
@@ -82,14 +90,22 @@ size_t runChannelReadLatencyBenchmark() {
 
     t1.join();
     t2.join();
-    return (totalNanoSecondsTaken / reads);
+
+    return { (totalNanoSecondsTakenReads / reads), (totalNanoSecondsTakenWrites / writes) };
 }
 
-//template size_t runChannelReadLatencyBenchmark<LockingChannel<Message>>();
-template size_t runChannelReadLatencyBenchmark<WaitFreeChannel<Message>>();
+template BenchmarkResult runChannelReadLatencyBenchmark<LockingChannel<Message>>();
+template BenchmarkResult runChannelReadLatencyBenchmark<WaitFreeChannel<Message>>();
 
 int main() {
-    std::cout << "locking averagePollingTimeNs=" << runChannelReadLatencyBenchmark<LockingChannel<Message>>() << std::endl;
-    std::cout << "waitFree averagePollingTimeNs=" << runChannelReadLatencyBenchmark<WaitFreeChannel<Message>>() << std::endl;
+    const auto lockingResult = runChannelReadLatencyBenchmark<LockingChannel<Message>>();
+    std::cout
+        << "locking averagePollingTimeNs=" << lockingResult.reads
+        << " averagePushingTimeNs=" << lockingResult.writes << std::endl;
+
+    const auto locklessResult = runChannelReadLatencyBenchmark<WaitFreeChannel<Message>>();
+    std::cout
+        << "waitFree averagePollingTimeNs=" << locklessResult.reads
+        << " averagePushingTimeNs=" << locklessResult.reads << std::endl;
     return EXIT_SUCCESS;
 }
