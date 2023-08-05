@@ -7,22 +7,29 @@
 // Based on tutorial: https://rigtorp.se/ringbuffer/
 // Lock-free writing, wait and lock-free reading
 // Supports move-only types
-template<typename T>
+template<typename T, size_t N = 256>
 class WaitFreeQueue {
-    std::optional<T> _values[std::numeric_limits<uint8_t>::max()+1];
-    alignas(64) std::atomic<uint8_t> _readIndex = 0;
-    alignas(64) uint8_t _readIndexCached = 0;
-    alignas(64) std::atomic<uint8_t> _writeIndex = 0;
-    alignas(64) uint8_t _writeIndexCached = 0;
+    std::optional<T> _values[N];
+    alignas(64) std::atomic<size_t> _readIndex = 0;
+    alignas(64) size_t _readIndexCached = 0;
+    alignas(64) std::atomic<size_t> _writeIndex = 0;
+    alignas(64) size_t _writeIndexCached = 0;
 
-    __attribute__((always_inline)) uint8_t getReadIndex(uint8_t nextWriteIndex) {
+    static size_t getNextIndex(size_t currentIndex) {
+        if ((currentIndex + 1) == N) {
+            return 0;
+        }
+        return currentIndex + 1;
+    }
+
+    __attribute__((always_inline)) size_t getReadIndex(size_t nextWriteIndex) {
         if (nextWriteIndex == _readIndexCached) {
             _readIndexCached = _readIndex.load(std::memory_order::acquire);
         }
         return _readIndexCached;
     }
 
-    __attribute__((always_inline)) uint8_t getWriteIndex(uint8_t nextReadIndex) {
+    __attribute__((always_inline)) size_t getWriteIndex(size_t nextReadIndex) {
         if (nextReadIndex == _writeIndexCached) {
             _writeIndexCached = _writeIndex.load(std::memory_order::acquire);
         }
@@ -38,14 +45,14 @@ public:
         }
 
         auto result = &_values[readIndex].value();
-        _readIndex.store(readIndex + uint8_t(1), std::memory_order::release);
+        _readIndex.store(getNextIndex(readIndex), std::memory_order::release);
         return result;
     }
 
     template<typename... Args>
     __attribute__((always_inline)) bool tryPublishLatestValue(Args&&... args) {
         const auto writeIndex = _writeIndex.load(std::memory_order::relaxed);
-        const auto nextWriteIndex = uint8_t(writeIndex + 1);
+        const auto nextWriteIndex = getNextIndex(writeIndex);
         if (nextWriteIndex == getReadIndex(nextWriteIndex)) {
             return false;
         }
