@@ -12,3 +12,6 @@ Strengthening my atomic operation knowledge with some hands-on coding.
 - [WaitFreeAsyncWorker](./WaitFreeAsyncWorker/WaitFreeAsyncWorker.hpp): Single background thread worker that leverages wait-free queues to allow rapid scheduling of tasks and subsequent callbacks. Results on M1 Macbook Air:
     - averageSchedulingTimeNs=97
     - averagePollingTimeNs=67
+- [WaitFreeChannelSingleUse](./WaitFreeChannelSingleUse/WaitFreeChannelSingleUse.hpp): Inter-thread communication 'channel' with lock and Wait free reading, lock-free writing. Can use more simpler, more relaxed atomic operations as there is no intention of re-use.  Results on M1 Macbook Air:
+    - locking averagePollingTimeNs=readTimeTaken=46ns, writeTimeTaken=41ns
+    - waitFree averagePollingTimeNs=readTimeTaken=24ns, writeTimeTaken=39ns
